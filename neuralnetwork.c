@@ -1,9 +1,4 @@
-/*
- * morsecode.c
- *
- *  Created on: Nov 23, 2015
- *      Author: EE113D
- */
+//Authors: Daniel Lau and Ben Quachtran
 // #include "L138_LCDK_aic3106_init.h"
 // #include "evmomapl138_gpio.h"
 
@@ -35,7 +30,7 @@
 // 	return;                       //return from ISR
 // }
 
-		int    i, j, k, p, m, n, np, op, ranpat[num_input], epoch;
+		int    i, j, k, p, m, n, np, op, ranpat[num_input], epoch, num_correct;
 	    int    NumPattern = num_input, NumInput = input_size*input_size, NumOutput = num_output;
 
 
@@ -205,11 +200,13 @@
 
 	    FILE * fp;
 
-static int train = 0, recognize = 1;
-
+static int train = 0, recognize = 0;
+int arg_max(double* array);
 int main(void)
 {
-	//load training digits and labels
+	//training or recognizing?
+	//train => load training data and labels
+	//load training digits and labels, do epochs, save weights
 	fp = fopen("training_digits.txt", "r");
 	for (i = 0; i < 10000; i++) {
 		for (j = 0; j < 28; j++) {
@@ -217,6 +214,7 @@ int main(void)
 				fscanf(fp, "%lf", &Input[i][j][k]);
 			}
 		}
+		// printf("image %d\n", i);
 	}
 	fclose(fp);
 
@@ -239,7 +237,7 @@ int main(void)
 					fscanf(fp,"%lf", &WeightIH[i][j][k]);
 			}
 		}
-		close(fp);
+		fclose(fp);
 
 		fp = fopen("weightsHO.txt", "r");
 		printf("opened weightsHO\n");
@@ -247,44 +245,126 @@ int main(void)
 			for (j = 0; j < num_output; j++) 
 				fscanf(fp, "%lf", &WeightHO[i][j]);
 		}
-		close(fp);
+		fclose(fp);
 
-      	for( i = 0 ; i < num_input ; i++ ) {    /* repeat for all the training patterns */
- //   p = ranpat[np];
-		    for( j = 0 ; j < NumHidden ; j++ ) {    /* compute hidden unit activations */
-		        SumH[i][j] = 0 ;
-		        for( k = 0; k < input_size ; k++ ) {
+			// printf("%lf  %lf  %lf  %lf \n", WeightHO[0][0], WeightHO[0][1],WeightHO[0][2], WeightHO[0][3]  );
+/////////////////////////////////////////////////
+  //     	for( i = 0 ; i < num_input ; i++ ) {    /* repeat for all the training patterns */
+		//     for( j = 0 ; j < NumHidden ; j++ ) {    /* compute hidden unit activations */
+		//         SumH[i][j] = 0 ;
+		//         for( k = 0; k < input_size ; k++ ) {
 
-		        	for (m = 0; m < input_size ; m++)
-		        	{
-		                SumH[i][j] += Input[i][k][m] * WeightIH[j][k][m] ;
-		        	}
-		        }
-		        Hidden[i][j] = 1.0/(1.0 + exp(-SumH[i][j])) ;
-		    }
-		    for( k = 0 ; k < num_output ; k++ ) {    /* compute output unit activations and errors */
-		        SumO[i][k] = 0 ;
-		        for( j = 0 ; j < NumHidden ; j++ ) {
-		            SumO[i][k] += Hidden[i][j] * WeightHO[j][k] ;
-		        }
-		        Output[i][k] = 1.0/(1.0 + exp(-SumO[i][k])) ;   /* Sigmoidal Outputs */
-		       // Output[p][k] = SumO[p][k];  //    Linear Outputs
-		    }
+		//         	for (m = 0; m < input_size ; m++)
+		//         	{
+		//                 SumH[i][j] += Input[i][k][m] * WeightIH[j][k][m] ;
+		//         	}
+		//         }
+		//         Hidden[i][j] = 1.0/(1.0 + exp(-SumH[i][j])) ;
+		//     }
+		//     for( k = 0 ; k < num_output ; k++ ) {    /* compute output unit activations and errors */
+		//         SumO[i][k] = 0 ;
+		//         for( j = 0 ; j < NumHidden ; j++ ) {
+		//             SumO[i][k] += Hidden[i][j] * WeightHO[j][k] ;
+		//         }
+		//         Output[i][k] = 1.0/(1.0 + exp(-SumO[i][k])) ;   /* Sigmoidal Outputs */
+		//        // Output[p][k] = SumO[p][k];  //    Linear Outputs
+		//     }
+		// }
+//////////////////////////////////////////
+		  printf("starting epochs\n");
+    for( epoch = 0 ; epoch < 2 ; epoch++) {    /* iterate weight updates */
+    	printf("epoch: %d \n",epoch);
+        // for( p = 0 ; p < NumPattern ; p++ ) {    /* randomize order of individuals */
+        //     ranpat[p] = p ;
+        // }
+        // for( p = 1 ; p < NumPattern ; p++) {
+        //     np = p + rando() * ( NumPattern + 1 - p ) ;
+        //     op = ranpat[p] ; ranpat[p] = ranpat[np] ; ranpat[np] = op ;
+        // }
+        Error = 0.0 ;
+
+
+
+        for( i = 0 ; i < num_input ; i++ ) {    /* repeat for all the training patterns */
+            for( j = 0 ; j < NumHidden ; j++ ) {    /* compute hidden unit activations */
+                SumH[i][j] = 0 ;
+                for( k = 0; k < input_size ; k++ ) {
+
+                	for (m = 0; m < input_size ; m++)
+                	{
+	                    SumH[i][j] += Input[i][k][m] * WeightIH[j][k][m] ;
+                	}
+                }
+                Hidden[i][j] = 1.0/(1.0 + exp(-SumH[i][j])) ;
+            }
+            for( k = 0 ; k < num_output ; k++ ) {    /* compute output unit activations and errors */
+                SumO[i][k] = 0 ;
+                for( j = 0 ; j < NumHidden ; j++ ) {
+                    SumO[i][k] += Hidden[i][j] * WeightHO[j][k] ;
+                }
+                Output[i][k] = 1.0/(1.0 + exp(-SumO[i][k])) ;   /* Sigmoidal Outputs */
+   //             Output[p][k] = SumO[p][k];  //    Linear Outputs
+
+	            // Error += 0.5 * (Target[i][k] - Output[i][k]) * (Target[i][k] - Output[i][k]) ;   /* SSE */
+	         	Error -= ( Target[i][k] * log( Output[i][k] ) + ( 1.0 - Target[i][k] ) * log( 1.0 - Output[i][k] ) ) ;  //  Cross-Entropy Error
+	      		// DeltaO[k] = (Target[i][k] - Output[i][k]) * Output[i][k] * (1.0 - Output[i][k]) ;   /* Sigmoidal Outputs, SSE 
+	        	DeltaO[k] = Target[i][k] - Output[i][k];  //   Sigmoidal Outputs, Cross-Entropy Error 
+	          	// DeltaO[k] = Target[i][k] - Output[i][k];    // Linear Outputs, SSE
+            }
+            for( j = 0 ; j < NumHidden ; j++ ) {    /* 'back-propagate' errors to hidden layer */
+               SumDOW[j] = 0.0 ;
+                for( k = 0 ; k < NumOutput ; k++ ) {
+                    SumDOW[j] += WeightHO[j][k] * DeltaO[k] ;
+                }
+                DeltaH[j] = SumDOW[j] * Hidden[i][j] * (1.0 - Hidden[i][j]) ;
+            }
+            // for( j = 0 ; j < NumHidden ; j++ ) {     /* update weights WeightIH */
+            //    // DeltaWeightIH[j][0][0] = eta * DeltaH[j] + alpha * DeltaWeightIH[0][j] ;
+            //    // WeightIH[0][j] += DeltaWeightIH[0][j] ;
+            //     for( m = 0 ; m < input_size ; m++ ) {
+
+            //     	for (n = 0; n < input_size ; n++)
+            //     	{
+            //         DeltaWeightIH[j][m][n] = eta * Input[i][m][n] * DeltaH[j] + alpha * DeltaWeightIH[j][m][n];
+            //         WeightIH[j][m][n] += DeltaWeightIH[j][m][n] ;
+            //     	}
+            //     }
+            // }
+            // for( j = 0 ; j < NumHidden ; j ++ ) {    /* update weights WeightHO */
+            //     // DeltaWeightHO[0][k] = eta * DeltaO[k] + alpha * DeltaWeightHO[0][k] ;
+            //     // WeightHO[0][k] += DeltaWeightHO[0][k] ;
+            //     for( k = 0 ; k < NumOutput ; k++ ) {
+            //         DeltaWeightHO[j][k] = eta * Hidden[i][j] * DeltaO[k] + alpha * DeltaWeightHO[j][k] ;
+            //         WeightHO[j][k] += DeltaWeightHO[j][k] ;
+            //     }
+            // }
+        }
+        if( epoch%100 == 0 ) fprintf(stdout, "\nEpoch %-5d :   Error = %lf", epoch, Error) ;
+        if( Error < 0.0004 ) break ;  /* stop learning when 'near enough' */
+    }
+		for (i = 0; i < num_input; i++) {
+			j = arg_max(Target[i]); 
+			k = arg_max(Output[i]);
+			// printf ("j: %d, k: %d\n",j,k);
+			if (j == k)	
+				num_correct++;
+
 		}
+		printf("percent correct: %lf\n", (double)((double)num_correct*100/(double)num_input));
 		printf("recognition done\n");
-		for( k = 0 ; k < NumOutput ; k++ ) {
-	        fprintf(stdout, "Target%-4d\tOutput%-4d\t", k, k) ;
-	    }
-	    for( p = 0 ; p < NumPattern ; p++ ) {
-	    fprintf(stdout, "\n%d\t", p) ;
-	        // for( i = 0 ; i < input_size ; i++ ) {
-	        // 	for (j = 0; j < input_size; j++)
-	        // 		fprintf(stdout, "%f\t", Input[p][i][j]) ;
-	        // }
-	        for( k = 0 ; k < NumOutput ; k++ ) {
-	            fprintf(stdout, "%f\t%f\t", Target[p][k], Output[p][k]) ;
-	        }
-	    }
+		// for( k = 0 ; k < NumOutput ; k++ ) {
+	 //        fprintf(stdout, "Target%-4d\tOutput%-4d\t", k, k) ;
+	 //    }
+	 //    for( p = 0 ; p < NumPattern ; p++ ) {
+	 //    fprintf(stdout, "\n%d\t", p) ;
+	 //        // for( i = 0 ; i < input_size ; i++ ) {
+	 //        // 	for (j = 0; j < input_size; j++)
+	 //        // 		fprintf(stdout, "%lf\t", Input[p][i][j]) ;
+	 //        // }
+	 //        for( k = 0 ; k < NumOutput ; k++ ) {
+	 //            fprintf(stdout, "%lf\t%lf\t", Target[p][k], Output[p][k]) ;
+	 //        }
+	 //    }
 	    fprintf(stdout, "\n\nGoodbye!\n\n") ;
 	    return 1;
 	}
@@ -355,7 +435,6 @@ int main(void)
 
 
         for( i = 0 ; i < num_input ; i++ ) {    /* repeat for all the training patterns */
-         //   p = ranpat[np];
             for( j = 0 ; j < NumHidden ; j++ ) {    /* compute hidden unit activations */
                 SumH[i][j] = 0 ;
                 for( k = 0; k < input_size ; k++ ) {
@@ -409,7 +488,7 @@ int main(void)
                 }
             }
         }
-        if( epoch%100 == 0 ) fprintf(stdout, "\nEpoch %-5d :   Error = %f", epoch, Error) ;
+        if( epoch%100 == 0 ) fprintf(stdout, "\nEpoch %-5d :   Error = %lf", epoch, Error) ;
         if( Error < 0.0004 ) break ;  /* stop learning when 'near enough' */
     }
 	    //write weights input->hidden
@@ -422,16 +501,17 @@ int main(void)
 			}
 			fprintf(fp, " \n");
 		}
-		close(fp);
+		fclose(fp);
 
 		//write weights hidden -> output
 		fp = fopen("weightsHO.txt", "w+");
 		for (i = 0; i < NumHidden; i++) {
 			for (j = 0; j < num_output; j++) {
-				fprintf(fp, "%lf", WeightHO[i][j]);
+				fprintf(fp, "%lf ", WeightHO[i][j]);
 			}
+			fprintf(fp," \n");
 		}
-		close(fp);
+		fclose(fp);
 		
 
 
@@ -439,19 +519,28 @@ int main(void)
 	    // for( i = 0 ; i < NumInput ; i++ ) {
 	    //     fprintf(stdout, "Input%-4d\t", i) ;
 	    // }
-	    for( k = 0 ; k < NumOutput ; k++ ) {
-	        fprintf(stdout, "Target%-4d\tOutput%-4d\t", k, k) ;
-	    }
-	    for( p = 0 ; p < NumPattern ; p++ ) {
-	    fprintf(stdout, "\n%d\t", p) ;
-	        // for( i = 0 ; i < input_size ; i++ ) {
-	        // 	for (j = 0; j < input_size; j++)
-	        // 		fprintf(stdout, "%f\t", Input[p][i][j]) ;
-	        // }
-	        for( k = 0 ; k < NumOutput ; k++ ) {
-	            fprintf(stdout, "%f\t%f\t", Target[p][k], Output[p][k]) ;
-	        }
-	    }
+	    // for( k = 0 ; k < NumOutput ; k++ ) {
+	    //     fprintf(stdout, "Target%-4d\tOutput%-4d\t", k, k) ;
+	    // }
+	    // for( p = 0 ; p < NumPattern ; p++ ) {
+	    // fprintf(stdout, "\n%d\t", p) ;
+	    //     // for( i = 0 ; i < input_size ; i++ ) {
+	    //     // 	for (j = 0; j < input_size; j++)
+	    //     // 		fprintf(stdout, "%lf\t", Input[p][i][j]) ;
+	    //     // }
+	    //     for( k = 0 ; k < NumOutput ; k++ ) {
+	    //         fprintf(stdout, "%lf\t%lf\t", Target[p][k], Output[p][k]) ;
+	    //     }
+	    // }
+	    for (i = 0; i < num_input; i++) {
+			j = arg_max(Target[i]); 
+			k = arg_max(Output[i]);
+		//	 printf ("j: %d, k: %d\n",j,k);
+			if (j == k)	
+				num_correct++;
+
+		}
+		printf("percent correct: %lf\n", (double)((double)num_correct*100/(double)num_input));
 	    fprintf(stdout, "\n\nGoodbye!\n\n") ;
 		// L138_initialise_intr(FS_8000_HZ,ADC_GAIN_0DB,DAC_ATTEN_0DB,LCDK_LINE_INPUT);
 		// 	while(1);
@@ -459,45 +548,16 @@ int main(void)
 	    return 1 ;
 }
 
-//struct cnn setup(struct cnn input, int images[1000][20][20], int labels[])
-//{
-//	int input_maps = 1;
-//	int num_layers = input.num_conv_layers + input.num_pool_layers;
-//	int mapsize = 400;
-//	int fan_out;
-//	int fan_in;
-//	int i;
-//	for (i=0; i < num_layers; i++)
-//	{
-//		if (i%2 == 0) 	// if even, it is a convolutional layer
-//		{
-//			mapsize = mapsize - input.kernel_size + 1;
-//			fan_out = input.output_map * (input.kernel_size * input.kernel_size);
-//
-//			int j;
-//			for (j=0; j < input.output_map; j++)
-//			{
-//
-//			}
-//		}
-//		else	// if odd, it is a subsampling layer
-//		{
-//
-//		}
-//	}
-//
-//
-//}
-
-
-//
-//struct cnn {
-//	int num_conv_layers;
-//	int num_pool_layers;
-//	int kernel_size;
-//	int output_map;
-//	double weights[1000][20][20];
-//	double bias[1000][1][20];
-//};
-
+int arg_max(double* array) {
+	int arg = 0;
+	int i = 0;
+	double current_max = 0;
+	for (i = 0; i < 14; i ++) {
+		if (array[i] > current_max) {
+			current_max = array[i];
+			arg = i;
+		}
+	}
+	return arg;
+}
 
