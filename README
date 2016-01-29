@@ -1,5 +1,10 @@
 Neural Network Implemented in C
 
-Recognizes Hand Written Digits
+95.43% accuracy using 800 Hidden Nodes
 
-1 Hidden Layer
+Using it to recognize Hand Written Digits.  Training with 10000 digits from MNIST database.
+14 Output Nodes (plan on expanding it to recognize +,-,x,/)
+
+However it can easily be adjusted to recognize other patterns by changing a couple parameters.
+
+
