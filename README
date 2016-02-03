@@ -2,9 +2,12 @@ Neural Network Implemented in C
 
 95.43% accuracy using 800 Hidden Nodes
 
-Using it to recognize Hand Written Digits.  Training with 10000 digits from MNIST database.
+Using it to recognize Hand Written Digits.  Training with 60000 digits from MNIST database.
 14 Output Nodes (plan on expanding it to recognize +,-,x,/)
 
 However it can easily be adjusted to recognize other patterns by changing a couple parameters.
 
+Based off of feed-forward back-propagation Algorithm detailed at http://www.cs.bham.ac.uk/~jxb/NN/nn.html. 
+
+Works with 2D images, but can easily be adapted for 1D datasets. 
 

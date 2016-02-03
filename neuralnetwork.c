@@ -18,10 +18,10 @@
 #define TRAIN_CONT 2
 #define IDENT 3
 
-#define num_input 1
+#define num_input 60000
 #define input_size 28
 #define num_output 14	
-#define NumHidden 800
+#define NumHidden 300
 
 // #define rando() ((double)rand()/(RAND_MAX+1))
 #define rando() ((double)rand()/(RAND_MAX))
@@ -45,14 +45,14 @@ static double SumH[num_input][num_output], WeightIH[NumHidden][input_size][input
 static double SumO[num_input][num_output], WeightHO[NumHidden][num_output], Output[num_input][num_output];
 static double DeltaO[num_output], SumDOW[NumHidden], DeltaH[NumHidden];
 static double DeltaWeightIH[NumHidden][input_size][input_size], DeltaWeightHO[NumHidden][num_output];
-double Error =0, eta = 0.01, alpha = 0.1, smallwt = 0.05;	//eta is learning rate,
+double Error =0, eta = 0.1, alpha = 0.1, smallwt = 0.05;	//eta is learning rate,
 
 FILE * fp;
 
 unsigned char * bitmap;
 
 static int display = 0, input_image = 1;
-static int mode = IDENT; //TRAIN_INIT, TRAIN_CONT, IDENT
+static int mode = TRAIN_INIT; //TRAIN_INIT, TRAIN_CONT, IDENT
 int arg_max(double* array);
 int main(void)
 {
@@ -80,14 +80,14 @@ int main(void)
 
 	//LOAD INPUT ARRAY WITH EITHER TRAINING DATA OR DATA TO IDENTIFY
 	if (mode != IDENT) {//not IDENT means its training
-		fp = fopen("training_digits.txt", "r");
+		fp = fopen("mnistimage.txt", "r");
 		for (i = 0; i < num_input; i++) 
 			for (j = 0; j < input_size; j++) 
 				for (k = 0; k < input_size; k++) 
-					fscanf(fp, "%lf", &Input[i][k][j]);/////switched and k and j
+					fscanf(fp, "%lf", &Input[i][j][k]);/////switched and k and j
 		fclose(fp);
 
-		fp = fopen("training_labels.txt", "r");
+		fp = fopen("mnistlabel.txt", "r");
 		for (i = 0; i < num_input; i++) 
 			for (j = 0; j < num_output; j++) 
 				fscanf(fp, "%lf", &Target[i][j]);
@@ -95,7 +95,7 @@ int main(void)
 		for (j = 0; j < input_size; j++) {//for testing, when we iterate through this way we want it to print normally
 			for (k = 0; k < input_size; k++) {
 				//printf("%.0lf ", Input[4050][j][k]);
-				 if (Input[6052][j][k] > 1 ) 
+				 if (Input[2][j][k] > 1 ) 
 				 	printf("1 ");
 				 else
 				 	printf("0 ");
@@ -108,7 +108,7 @@ int main(void)
 
 	if (mode == IDENT) {//load the image into input
 		if (input_image == 1) {
-			bitmap = imread("/Users/Daniel/Documents/Neural_Network/six1.bmp");
+			bitmap = imread("/Users/Daniel/Documents/Neural_Network/zero.bmp");
 			for (i = 0; i < num_input; i++) 
 				for (j = 0; j < input_size; j++) 
 					for (k = 0; k < input_size; k++) 
@@ -226,7 +226,7 @@ int main(void)
 
 	if (mode != IDENT) { //if training
 	    printf("starting epochs\n");
-	    for( epoch = 0 ; epoch < 2; epoch++) {    /* iterate weight updates */
+	    for( epoch = 0 ; epoch < 1; epoch++) {    /* iterate weight updates */
 	    	// printf("epoch: %d \n",epoch);
 	    	if (eta > 0.000001)
 				eta = eta *.5;
