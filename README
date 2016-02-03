@@ -1,5 +1,7 @@
 Neural Network Implemented in C
 
+Authors: Daniel Lau and Ben Quachtran
+
 95.43% accuracy using 800 Hidden Nodes
 
 Using it to recognize Hand Written Digits.  Training with 60000 digits from MNIST database.
