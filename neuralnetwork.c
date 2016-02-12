@@ -18,10 +18,11 @@
 #define TRAIN_CONT 2
 #define IDENT 3
 
-#define num_input 60000
+#define num_input 28000
 #define input_size 28
 #define num_output 14	
-#define NumHidden 300
+#define NumHidden 700
+#define num_epochs 3
 
 // #define rando() ((double)rand()/(RAND_MAX+1))
 #define rando() ((double)rand()/(RAND_MAX))
@@ -35,35 +36,330 @@
 // 	return;                       //return from ISR
 // }
 
-int    i, j, k, p, m, n, np, op, ip, ranpat[num_input], epoch, num_correct;
-int    NumPattern = num_input, NumInput = input_size*input_size, NumOutput = num_output;
 
-static double Input[num_input][input_size][input_size]; 
-static double Target[num_input][num_output]; 
+double Input[num_input][input_size][input_size]; 
+double Target[num_input][num_output]; 
 		
+int count_digits[num_output];
+int correct_digits[num_output];
+
 static double SumH[num_input][num_output], WeightIH[NumHidden][input_size][input_size], Hidden[num_input][NumHidden];
 static double SumO[num_input][num_output], WeightHO[NumHidden][num_output], Output[num_input][num_output];
 static double DeltaO[num_output], SumDOW[NumHidden], DeltaH[NumHidden];
-static double DeltaWeightIH[NumHidden][input_size][input_size], DeltaWeightHO[NumHidden][num_output];
-double Error =0, eta = 0.1, alpha = 0.1, smallwt = 0.05;	//eta is learning rate,
+double DeltaWeightIH[NumHidden][input_size][input_size], DeltaWeightHO[NumHidden][num_output];
+double Error =0, eta = 0.01, alpha = 0.1, smallwt = 0.05;	//eta is learning rate,
 
-FILE * fp;
-
-unsigned char * bitmap;
-
-static int display = 0, input_image = 1;
-static int mode = TRAIN_INIT; //TRAIN_INIT, TRAIN_CONT, IDENT
 int arg_max(double* array);
+void split_bmp(char* file, double first[input_size][input_size], double second[input_size][input_size], double third[input_size][input_size]);
+int identify_image(double image[input_size][input_size], int load_w, char * IH, char * HO);
+void train_network(int cont, char * images, char * labels, char * IH, char * HO);
+void batch_identify(int load_w, char * images, char * labels, char * IH, char * HO);
+void init();
+void load_weights(char * IH, char * HO);
+void initialize_weights();
+void print_image(double img[input_size][input_size]);
+void load_image(char * file, double tmp[input_size][input_size]);
 int main(void)
 {
-	printf("mode: %d, eta: %lf, alpha: %lf, hidden: %d, display: %d\n", mode, eta, alpha, NumHidden, display);
-
+	printf("eta: %lf, alpha: %lf, hidden: %d, num_input: %d\n", eta, alpha, NumHidden,num_input);
+	
 	//initializing lots of things to 0 (i think its unnecessary)
+	init();
+	train_network(0,"combined_images.txt", "combined_labels.txt", "Weights/weightsIH_combined.txt", "Weights/weightsHO_combined.txt");
+	// train_network(0,"signs_images.txt", "signs_labels.txt", "Weights/weightsIH_signs.txt", "Weights/weightsHO_signs.txt");
+	// batch_identify(1, "mnisttest.txt", "mnisttestlabel.txt", "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	double first[input_size][input_size], second[input_size][input_size], third[input_size][input_size];
+	// split_bmp("/Users/Daniel/Documents/Neural_Network/Numbers/zeroonefour.bmp",first,second,third);	
+	// print_image(first);
+	// load_weights("Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	
+
+	// int c = identify_image(first,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	// printf("image is a: %d\n",c);
+	// c = identify_image(second,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	// printf("image is a: %d\n",c);
+	// c = identify_image(third,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	// printf("image is a: %d\n",c);
+	
+ //    fprintf(stdout, "Goodbye!\n") ;
+	// // L138_initialise_intr(FS_8000_HZ,ADC_GAIN_0DB,DAC_ATTEN_0DB,LCDK_LINE_INPUT);
+	// // 	while(1);
+
+    return 1 ;
+}
+
+void train_network(int cont, char * images, char * labels, char * IH, char * HO) {
+	int i,j,k,m,n,op,ip,epoch, num_correct;
+	int ranpat[num_input];
+	FILE * fp;
+	//load training data into Input and load training labels into Target
+	printf("loading training data\n");
+	fp = fopen(images, "r");
+	for (i = 0; i < num_input; i++) 
+		for (j = 0; j < input_size; j++) 
+			for (k = 0; k < input_size; k++) 
+				fscanf(fp, "%lf", &Input[i][j][k]);/////switched and k and j
+	fclose(fp);
+	print_image(Input[500]);
+	print_image(Input[2500]);
+	print_image(Input[4500]);
+	print_image(Input[6500]);
+	fp = fopen(labels, "r");
+	for (i = 0; i < num_input; i++) 
+		for (j = 0; j < num_output; j++) 
+			fscanf(fp, "%lf", &Target[i][j]);
+	fclose(fp);
+
+	//set the weights for initial or continue training
+    printf("initializing weights\n");
+    if (cont == 0) 
+ 		initialize_weights();
+    else 
+    	load_weights(IH, HO);
+
+	printf("starting epochs\n");
+    for( epoch = 0 ; epoch < num_epochs; epoch++) {    /* iterate weight updates */
+    	// printf("epoch: %d \n",epoch);
+        for( i = 0 ; i < num_input ; i++ )    /* randomize order of individuals */
+            ranpat[i] = i ;
+        for ( i = num_input-1; i > 0; i--) {//knuth shuffle
+        	ip = rand() % (i+1);
+        	op = ranpat[i]; ranpat[i] = ranpat[ip] ; ranpat[ip] = op;
+        }
+        Error = 0;
+        for( ip = 0 ; ip < num_input ; ip++ ) {  // repeat for all the training patterns 
+        	i = ranpat[ip];
+            for( j = 0 ; j < NumHidden ; j++ ) {    /* compute hidden unit activations */
+                SumH[i][j] = 0;
+                for( k = 0; k < input_size ; k++ )
+                	for (m = 0; m < input_size ; m++)
+	                    SumH[i][j] += Input[i][k][m] * WeightIH[j][k][m] ;
+                Hidden[i][j] = 1.0/(1.0 + exp(-SumH[i][j])) ;
+            }
+            for( k = 0 ; k < num_output ; k++ ) {    /* compute output unit activations and errors */
+                SumO[i][k] = 0;
+                for( j = 0 ; j < NumHidden ; j++ ) 
+                    SumO[i][k] += Hidden[i][j] * WeightHO[j][k] ;
+                Output[i][k] = 1.0/(1.0 + exp(-SumO[i][k])) ;   /* Sigmoidal Outputs */
+               	// Output[p][k] = SumO[p][k];  //    Linear Outputs
+	            Error += 0.5 * (Target[i][k] - Output[i][k]) * (Target[i][k] - Output[i][k]) ;   /* SSE */
+	         	// Error -= ( Target[i][k] * log( Output[i][k] ) + ( 1.0 - Target[i][k] ) * log( 1.0 - Output[i][k] ) ) ;  //  Cross-Entropy Error
+	      		DeltaO[k] = (Target[i][k] - Output[i][k]) * Output[i][k] * (1.0 - Output[i][k]) ;   // Sigmoidal Outputs, SSE  
+	        	// DeltaO[k] = Target[i][k] - Output[i][k];  //   Sigmoidal Outputs, Cross-Entropy Error 
+	          	// DeltaO[k] = Target[i][k] - Output[i][k];    // Linear Outputs, SSE
+            }
+            for( j = 0 ; j < NumHidden ; j++ ) {    /* 'back-propagate' errors to hidden layer */
+               	SumDOW[j] = 0.0 ;
+                for( k = 0 ; k < num_output ; k++ )
+                    SumDOW[j] += WeightHO[j][k] * DeltaO[k] ;
+                DeltaH[j] = SumDOW[j] * Hidden[i][j] * (1.0 - Hidden[i][j]) ;
+            }
+            for( j = 0 ; j < NumHidden ; j++ ) {     /* update weights WeightIH */
+                for( m = 0 ; m < input_size ; m++ ) 
+                	for (n = 0; n < input_size ; n++)
+                	{
+	                    DeltaWeightIH[j][m][n] = eta * Input[i][m][n] * DeltaH[j] + alpha * DeltaWeightIH[j][m][n];
+	                    WeightIH[j][m][n] += DeltaWeightIH[j][m][n];
+                	}
+            }
+            for( j = 0 ; j < NumHidden ; j ++ ) {    /* update weights WeightHO */
+                for( k = 0 ; k < num_output ; k++ ) {
+                    DeltaWeightHO[j][k] = eta * Hidden[i][j] * DeltaO[k] + alpha * DeltaWeightHO[j][k] ;
+                    WeightHO[j][k] += DeltaWeightHO[j][k] ;
+                }
+            }
+        }
+        num_correct = 0;
+		for (i = 0; i < num_input; i++) {
+			j = arg_max(Target[i]); 
+			k = arg_max(Output[i]);
+			if (j == k)	
+				num_correct++;
+		} 
+        // if( epoch%100 == 0 ) 
+        	fprintf(stdout, "Epoch %-5d :   Error = %lf , Percent Correct: %lf\n", epoch, Error,(double)((double)num_correct*100/(double)num_input));
+        if( Error < 0.0004 ) 
+        	break ;  /* stop learning when 'near enough' */
+    	if (eta > 0.000001)
+			eta = eta *.5;
+    }
+
+    //write weights input->hidden
+    fp = fopen(IH, "w+");
+	for (i = 0; i < NumHidden; i++) {
+		for (j = 0; j < input_size; j++) 
+			for (k = 0; k < input_size; k++)
+				fprintf(fp, "%lf ", WeightIH[i][j][k]);
+		fprintf(fp, " \n");
+	}
+	fclose(fp);
+
+	//write weights hidden -> output
+	fp = fopen(HO, "w+");
+	for (i = 0; i < NumHidden; i++) {
+		for (j = 0; j < num_output; j++) 
+			fprintf(fp, "%lf ", WeightHO[i][j]);
+		fprintf(fp," \n");
+	}
+	fclose(fp);
+
+	fp = fopen("eta.txt", "w+"); //write eta to file
+	fprintf(fp, "%lf", eta);
+	fclose(fp);  
+
+   num_correct = 0;
+    for (i = 0; i < num_input; i++) {
+		j = arg_max(Target[i]); 
+		k = arg_max(Output[i]);
+		count_digits[k]++;
+		 // printf ("j: %d, k: %d\n",j,k);
+		if (j == k)	{
+			correct_digits[k]++;
+			num_correct++;
+		}
+
+	}
+	for (i = 0; i < num_output - 4; i++) {
+		printf("percent correct for %d: %d / %d = %.2f \n", i,correct_digits[i],count_digits[i], (double)correct_digits[i]/count_digits[i]);
+	}
+	printf("percent correct: %lf error: %lf\n", (double)((double)num_correct*100/(double)num_input),Error);	 	
+}
+int arg_max(double* array) {
+	int arg = 0;
+	int i = 0;
+	double current_max = 0;
+	for (i = 0; i < num_output; i ++) {
+		if (array[i] > current_max) {
+			current_max = array[i];
+			arg = i;
+		}
+	}
+	return arg;
+}
+
+void split_bmp(char* file, double first[input_size][input_size], double second[input_size][input_size], double third[input_size][input_size]) { 
+	int i,j,k;
+	unsigned char *bitmap = imread(file);
+	// printf("splitting bmp\n");
+	for (j = 0; j < input_size; j++) {
+		for (k = 0; k < input_size*3; k++) {
+			if (k < input_size) {
+				first[input_size - 1 -j][k % input_size] = bitmap[3*(j*input_size*3 +k)];
+			}
+			else if (k < input_size * 2) {
+				second[input_size - 1 -j][k % input_size] = bitmap[3*(j*input_size*3 +k)];
+			}
+			else
+				third[input_size - 1 -j][k % input_size] = bitmap[3*(j*input_size*3 +k)];
+		}
+	}	
+}
+
+int identify_image(double image[input_size][input_size], int load_w, char * IH, char * HO) {
+	int j,k,m;
+	double sum_hidden[NumHidden] = {0};
+	double sum_output[num_output] = {0};
+	double img_output[num_output] = {0};
+	double img_hidden[NumHidden] = {0};
+	if (load_w) 
+		load_weights(IH, HO);
+	// print_image(image);
+    for( j = 0 ; j < NumHidden ; j++ ) {    // compute hidden unit activations 
+       sum_hidden[j] = 0 ;
+        for( k = 0; k < input_size ; k++ ) {
+        	for (m = 0; m < input_size ; m++){
+                // sum_hidden[j] += Input[i][k][m] * WeightIH[j][k][m];
+                sum_hidden[j] += image[k][m] * WeightIH[j][k][m];
+        	}
+        }
+        img_hidden[j] = 1.0/(1.0 + exp(-sum_hidden[j])) ; 
+    }
+    for( k = 0 ; k < num_output ; k++ ) {     //compute output unit activations and errors 
+        sum_output[k] = 0 ;
+        for( j = 0 ; j < NumHidden ; j++ ) {
+            sum_output[k] += img_hidden[j] * WeightHO[j][k];
+        }
+        img_output[k] = 1.0/(1.0 + exp(-sum_output[k]));   //Sigmoidal Outputs 
+       // Output[p][k] = SumO[p][k];  //    Linear Outputs
+        // Error += 0.5 * (Target[i][k] - Output[i][k]) * (Target[i][k] - Output[i][k]); 
+        // printf("%.2lf \n", Error);
+    }
+	return arg_max(img_output);
+}
+
+void batch_identify(int load_w, char * images, char * labels, char * IH, char * HO) {
+	int correct = 0;
+	int i, j, k;
+	FILE * fp;
+	if (load_w) {
+		load_weights(IH, HO);
+	}
+	fp = fopen(images, "r");
+	for (i = 0; i < num_input; i++) 
+		for (j = 0; j < input_size; j++) 
+			for (k = 0; k < input_size; k++) 
+				fscanf(fp, "%lf", &Input[i][j][k]);/////switched and k and j
+	fclose(fp);
+
+	fp = fopen(labels, "r");
+	for (i = 0; i < num_input; i++) 
+		for (j = 0; j < num_output; j++) 
+			fscanf(fp, "%lf", &Target[i][j]);
+
+	for (i = 0; i < num_input;i++) {
+		if (arg_max(Target[i]) == identify_image(Input[i], 0, NULL, NULL))
+			correct++;
+	}
+	printf("percent correct: %lf\n", (double)((double)correct*100/(double)num_input));
+}
+
+void load_weights(char * IH, char * HO) {
+	int i,j,k;
+	FILE * fp;
+	printf("loading weights\n");
+	fp = fopen(IH, "r");
+	for (i = 0; i < NumHidden; i++) 
+		for (j = 0; j < input_size; j++) 
+			for (k = 0; k < input_size; k++)
+				fscanf(fp,"%lf", &WeightIH[i][j][k]);//read in weightsIH
+	fclose(fp);
+
+	fp = fopen(HO, "r");
+	for (i = 0; i < NumHidden; i++) 
+		for (j = 0; j < num_output; j++) 
+			fscanf(fp, "%lf", &WeightHO[i][j]); //read in weightsOH
+	fclose(fp);
+
+	fp = fopen("eta.txt", "r");
+	fscanf(fp, "%lf", &eta);
+	fclose(fp);
+	printf("done loading weights\n");
+}
+void initialize_weights() {
+	int i, j, k;
+    for( i = 0 ; i < NumHidden ; i++ )    /* initialize WeightIH and DeltaWeightIH */
+        for( j = 0 ; j < input_size ; j++ ) 
+        	for (k = 0; k < input_size ; k++)
+        	{
+	            DeltaWeightIH[i][j][k] = 0.0 ;
+	            WeightIH[i][j][k] = 2.0 * ( rando() - 0.5 ) * smallwt ;
+        	}
+    for( i = 0 ; i < NumHidden ; i++ ) {   /* initialize WeightHO and DeltaWeightHO */
+        for( j = 0 ; j < num_output ; j++ ) {
+            DeltaWeightHO[i][j] = 0.0 ;
+            WeightHO[i][j] = 2.0 * ( rando() - 0.5 ) * smallwt ;
+    	}
+    }	
+}
+void init() {
+	int i, j, k;
 	for (i = 0; i < NumHidden; i++) {
 		DeltaH[i] = 0;
 	}
 	for (i = 0; i < num_output; i++) {
 		DeltaO[i] = 0;
+		count_digits[i] = 0;
+		correct_digits[i] = 0;
 	}
 	for (i = 0; i < num_input; i++) {
         for( j = 0 ; j < input_size ; j++ ) 
@@ -77,291 +373,31 @@ int main(void)
     for( i = 0 ; i < NumHidden ; i++ )   
         for( j = 0 ; j < num_output ; j++ ) 
             DeltaWeightHO[i][j] = 0.0;
-
-	//LOAD INPUT ARRAY WITH EITHER TRAINING DATA OR DATA TO IDENTIFY
-	if (mode != IDENT) {//not IDENT means its training
-		fp = fopen("mnistimage.txt", "r");
-		for (i = 0; i < num_input; i++) 
-			for (j = 0; j < input_size; j++) 
-				for (k = 0; k < input_size; k++) 
-					fscanf(fp, "%lf", &Input[i][j][k]);/////switched and k and j
-		fclose(fp);
-
-		fp = fopen("mnistlabel.txt", "r");
-		for (i = 0; i < num_input; i++) 
-			for (j = 0; j < num_output; j++) 
-				fscanf(fp, "%lf", &Target[i][j]);
-
-		for (j = 0; j < input_size; j++) {//for testing, when we iterate through this way we want it to print normally
-			for (k = 0; k < input_size; k++) {
-				//printf("%.0lf ", Input[4050][j][k]);
-				 if (Input[2][j][k] > 1 ) 
-				 	printf("1 ");
-				 else
-				 	printf("0 ");
-			}
-			printf(" \n");
-		}
-		fclose(fp);
-
-	}
-
-	if (mode == IDENT) {//load the image into input
-		if (input_image == 1) {
-			bitmap = imread("/Users/Daniel/Documents/Neural_Network/zero.bmp");
-			for (i = 0; i < num_input; i++) 
-				for (j = 0; j < input_size; j++) 
-					for (k = 0; k < input_size; k++) 
-						Input[i][input_size - j][k] = bitmap[3*(j*input_size + k)];	// flip along diagonal going from top left to bottom right
-
-			for (i = 0; i < num_input; i++) {//if we iterate through in this order we want it to print it normally
-				for (j = 0; j < input_size; j++) {
-					for (k = 0; k < input_size; k++) {
-						// printf("%.0lf ", Input[i][j][k]);
-						if (Input[i][j][k] > 1)
-							printf("1 ");
-						else 
-							printf("0 ");
-					}
-					printf("\n"); 
-				}
-			}
-			printf("here\n");
-			for (i = 0; i < num_output; i++) 
-				Target[0][i] = 0;
-			Target[0][6] = 1; 
-			for (i = 0; i < num_output; i++ ) {
-				printf("%.2lf ", Target[0][i]);
-			}
-			printf("\n");
-		}
-		else {
-			fp = fopen("training_digits.txt", "r");
-			for (i = 0; i < num_input; i++) 
-				for (j = 0; j < input_size; j++) 
-					for (k = 0; k < input_size; k++) 
-						fscanf(fp, "%lf", &Input[i][k][j]);/////switched and k and j
-			fclose(fp);
-
-			fp = fopen("training_labels.txt", "r");
-			for (i = 0; i < num_input; i++) 
-				for (j = 0; j < num_output; j++) 
-					fscanf(fp, "%lf", &Target[i][j]);
-		}
-	}
-
-	/////////if not doing initial training, load in the weights and eta
-	if (mode != TRAIN_INIT) {
-		printf("begin recognition\n");
-		fp = fopen("weightsIH.txt", "r");
-		for (i = 0; i < NumHidden; i++) 
-			for (j = 0; j < input_size; j++) 
-				for (k = 0; k < input_size; k++)
-					fscanf(fp,"%lf", &WeightIH[i][j][k]);//read in weightsIH
-		fclose(fp);
-
-		fp = fopen("weightsHO.txt", "r");
-		for (i = 0; i < NumHidden; i++) 
-			for (j = 0; j < num_output; j++) 
-				fscanf(fp, "%lf", &WeightHO[i][j]); //read in weightsOH
-		fclose(fp);
-
-		fp = fopen("eta.txt", "r");
-		fscanf(fp, "%lf", &eta);
-		fclose(fp);
-	}
-
-	if (mode == IDENT) {//if identifying images
-		printf("first\n");
-		for (i = 0; i < num_output; i++ ) {
-			printf("%.2lf ", Target[0][i]);
-		}
-		printf("\n");
-      	for( i = 0 ; i < num_input ; i++ ) {    //repeat for all the training patterns 
-		    for( j = 0 ; j < NumHidden ; j++ ) {    // compute hidden unit activations 
-		       SumH[i][j] = 0 ;
-		        for( k = 0; k < input_size ; k++ ) {
-		        	for (m = 0; m < input_size ; m++){
-		                SumH[i][j] += Input[i][k][m] * WeightIH[j][k][m];
-		        	}
-		        }
-		        Hidden[i][j] = 1.0/(1.0 + exp(-SumH[i][j])) ; 
-		    }
-		    for( k = 0 ; k < num_output ; k++ ) {     //compute output unit activations and errors 
-		        SumO[i][k] = 0 ;
-		        for( j = 0 ; j < NumHidden ; j++ ) {
-		            SumO[i][k] += Hidden[i][j] * WeightHO[j][k];
-		        }
-		        Output[i][k] = 1.0/(1.0 + exp(-SumO[i][k]));   //Sigmoidal Outputs 
-		       // Output[p][k] = SumO[p][k];  //    Linear Outputs
-		        Error += 0.5 * (Target[i][k] - Output[i][k]) * (Target[i][k] - Output[i][k]); 
-		        // printf("%.2lf \n", Error);
-		    }
-		}
-		printf("messed up\n");
-		for (i = 0; i < num_output; i++ ) {
-			printf("%.2lf ", Target[0][i]);
-		}
-		printf("\n");
-		for (i = 0; i < num_output; i++ ) {
-			printf("%.2lf ", Output[0][i]);
-		}
-		printf("\nIt is a %d\n", arg_max(Output[0]));
-	}
-	if (mode == TRAIN_INIT) {//for initial training we need to initalize the weights
-	    printf("initializing weights\n");
-	    for( i = 0 ; i < NumHidden ; i++ )    /* initialize WeightIH and DeltaWeightIH */
-	        for( j = 0 ; j < input_size ; j++ ) 
-	        	for (k = 0; k < input_size ; k++)
-	        	{
-		            DeltaWeightIH[i][j][k] = 0.0 ;
-		            WeightIH[i][j][k] = 2.0 * ( rando() - 0.5 ) * smallwt ;
-	        	}
-	    for( i = 0 ; i < NumHidden ; i++ )    /* initialize WeightHO and DeltaWeightHO */
-	        for( j = 0 ; j < num_output ; j++ ) {
-	            DeltaWeightHO[i][j] = 0.0 ;
-	            WeightHO[i][j] = 2.0 * ( rando() - 0.5 ) * smallwt ;
-	        }
-	}
-
-	if (mode != IDENT) { //if training
-	    printf("starting epochs\n");
-	    for( epoch = 0 ; epoch < 1; epoch++) {    /* iterate weight updates */
-	    	// printf("epoch: %d \n",epoch);
-	    	if (eta > 0.000001)
-				eta = eta *.5;
-	        for( i = 0 ; i < NumPattern ; i++ )    /* randomize order of individuals */
-	            ranpat[i] = i ;
-	        for ( i = NumPattern-1; i > 0; i--) {//knuth shuffle
-	        	ip = rand() % (i+1);
-	        	op = ranpat[i]; ranpat[i] = ranpat[ip] ; ranpat[ip] = op;
-	        }
-	        Error = 0;
-	        for( ip = 0 ; ip < num_input ; ip++ ) {  // repeat for all the training patterns 
-	        	i = ranpat[ip];
-	            for( j = 0 ; j < NumHidden ; j++ ) {    /* compute hidden unit activations */
-	                SumH[i][j] = 0;
-	                for( k = 0; k < input_size ; k++ )
-	                	for (m = 0; m < input_size ; m++)
-		                    SumH[i][j] += Input[i][k][m] * WeightIH[j][k][m] ;
-	                Hidden[i][j] = 1.0/(1.0 + exp(-SumH[i][j])) ;
-	            }
-	            for( k = 0 ; k < num_output ; k++ ) {    /* compute output unit activations and errors */
-	                SumO[i][k] = 0;
-	                for( j = 0 ; j < NumHidden ; j++ ) 
-	                    SumO[i][k] += Hidden[i][j] * WeightHO[j][k] ;
-	                Output[i][k] = 1.0/(1.0 + exp(-SumO[i][k])) ;   /* Sigmoidal Outputs */
-	               	// Output[p][k] = SumO[p][k];  //    Linear Outputs
-		            Error += 0.5 * (Target[i][k] - Output[i][k]) * (Target[i][k] - Output[i][k]) ;   /* SSE */
-		         	// Error -= ( Target[i][k] * log( Output[i][k] ) + ( 1.0 - Target[i][k] ) * log( 1.0 - Output[i][k] ) ) ;  //  Cross-Entropy Error
-		      		DeltaO[k] = (Target[i][k] - Output[i][k]) * Output[i][k] * (1.0 - Output[i][k]) ;   // Sigmoidal Outputs, SSE  
-		        	// DeltaO[k] = Target[i][k] - Output[i][k];  //   Sigmoidal Outputs, Cross-Entropy Error 
-		          	// DeltaO[k] = Target[i][k] - Output[i][k];    // Linear Outputs, SSE
-	            }
-	            for( j = 0 ; j < NumHidden ; j++ ) {    /* 'back-propagate' errors to hidden layer */
-	               	SumDOW[j] = 0.0 ;
-	                for( k = 0 ; k < NumOutput ; k++ )
-	                    SumDOW[j] += WeightHO[j][k] * DeltaO[k] ;
-	                DeltaH[j] = SumDOW[j] * Hidden[i][j] * (1.0 - Hidden[i][j]) ;
-	            }
-	            for( j = 0 ; j < NumHidden ; j++ ) {     /* update weights WeightIH */
-	                for( m = 0 ; m < input_size ; m++ ) 
-	                	for (n = 0; n < input_size ; n++)
-	                	{
-		                    DeltaWeightIH[j][m][n] = eta * Input[i][m][n] * DeltaH[j] + alpha * DeltaWeightIH[j][m][n];
-		                    WeightIH[j][m][n] += DeltaWeightIH[j][m][n];
-	                	}
-	            }
-	            for( j = 0 ; j < NumHidden ; j ++ ) {    /* update weights WeightHO */
-	                for( k = 0 ; k < NumOutput ; k++ ) {
-	                    DeltaWeightHO[j][k] = eta * Hidden[i][j] * DeltaO[k] + alpha * DeltaWeightHO[j][k] ;
-	                    WeightHO[j][k] += DeltaWeightHO[j][k] ;
-	                }
-	            }
-	        }
-	        num_correct = 0;
-			for (i = 0; i < num_input; i++) {
-				j = arg_max(Target[i]); 
-				k = arg_max(Output[i]);
-				if (j == k)	
-					num_correct++;
-			} 
-	        // if( epoch%100 == 0 ) 
-	        	fprintf(stdout, "Epoch %-5d :   Error = %lf , Percent Correct: %lf\n", epoch, Error,(double)((double)num_correct*100/(double)num_input));
-	        if( Error < 0.0004 ) 
-	        	break ;  /* stop learning when 'near enough' */
-	    }
-	
-	    //write weights input->hidden
-	    fp = fopen("weightsIH.txt", "w+");
-		for (i = 0; i < NumHidden; i++) {
-			for (j = 0; j < input_size; j++) 
-				for (k = 0; k < input_size; k++)
-					fprintf(fp, "%lf ", WeightIH[i][j][k]);
-			fprintf(fp, " \n");
-		}
-		fclose(fp);
-
-		//write weights hidden -> output
-		fp = fopen("weightsHO.txt", "w+");
-		for (i = 0; i < NumHidden; i++) {
-			for (j = 0; j < num_output; j++) 
-				fprintf(fp, "%lf ", WeightHO[i][j]);
-			fprintf(fp," \n");
-		}
-		fclose(fp);
-
-		fp = fopen("eta.txt", "w+"); //write eta to file
-		fprintf(fp, "%lf", eta);
-		fclose(fp);
-	}
-		
-
-
-    fprintf(stdout, "NETWORK DATA - EPOCH %d\n", epoch) ;   /* print network outputs */
-    if (display == 1) {
-			for( i = 0 ; i < NumInput ; i++ ) 
-		        fprintf(stdout, "Input%-4d\t", i) ;
-		    for( k = 0 ; k < NumOutput ; k++ ) 
-		        fprintf(stdout, "Target%-4d\tOutput%-4d\t", k, k) ;
-		    for( p = 0 ; p < NumPattern ; p++ ) {
-		    	fprintf(stdout, "\n%d\t", p) ;
-		        // for( i = 0 ; i < input_size ; i++ ) {
-		        // 	for (j = 0; j < input_size; j++)
-		        // 		fprintf(stdout, "%lf\t", Input[p][i][j]) ;
-		        // }
-		        for( k = 0 ; k < NumOutput ; k++ ) {
-		            fprintf(stdout, "%lf\t%lf\t", Target[p][k], Output[p][k]) ;
-		        }
-		    }
-	}
-    num_correct = 0;
-    for (i = 0; i < num_input; i++) {
-		j = arg_max(Target[i]); 
-		k = arg_max(Output[i]);
-	//	 printf ("j: %d, k: %d\n",j,k);
-		if (j == k)	
-			num_correct++;
-
-	}
-	printf("percent correct: %lf error: %lf\n", (double)((double)num_correct*100/(double)num_input),Error);
-    fprintf(stdout, "Goodbye!\n") ;
-	// L138_initialise_intr(FS_8000_HZ,ADC_GAIN_0DB,DAC_ATTEN_0DB,LCDK_LINE_INPUT);
-	// 	while(1);
-
-    return 1 ;
 }
 
-int arg_max(double* array) {
-	int arg = 0;
-	int i = 0;
-	double current_max = 0;
-	for (i = 0; i < num_output; i ++) {
-		if (array[i] > current_max) {
-			current_max = array[i];
-			arg = i;
+void print_image(double image[input_size][input_size]) {
+	int j, k;
+	for (j = 0; j < input_size; j++) {
+		for (k = 0; k < input_size; k++) {
+			if (image[j][k] > 1)
+				printf("1 ");
+			else
+				printf("0 ");
 		}
+		printf("\n");
 	}
-	return arg;
+	printf("\n");
 }
+
+void load_image(char * file, double tmp[input_size][input_size]) {
+	int j,k;
+	unsigned char * bitmap = imread(file); 
+	for (j = 0; j < input_size; j++) 
+		for (k = 0; k < input_size; k++) 
+			tmp[input_size - 1 - j][k] = bitmap[3*(j*input_size + k)];	// flip along diagonal going from top left to bottom right
+}
+
+
+
+
 
