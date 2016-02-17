@@ -18,7 +18,7 @@
 #define TRAIN_CONT 2
 #define IDENT 3
 
-#define num_input 28000
+#define num_input 10000
 #define input_size 28
 #define num_output 14	
 #define NumHidden 700
@@ -53,7 +53,7 @@ int arg_max(double* array);
 void split_bmp(char* file, double first[input_size][input_size], double second[input_size][input_size], double third[input_size][input_size]);
 int identify_image(double image[input_size][input_size], int load_w, char * IH, char * HO);
 void train_network(int cont, char * images, char * labels, char * IH, char * HO);
-void batch_identify(int load_w, char * images, char * labels, char * IH, char * HO);
+void batch_identify(int load_w, char * images, char * labels, char * IH, char * HO, int num_images);
 void init();
 void load_weights(char * IH, char * HO);
 void initialize_weights();
@@ -65,21 +65,45 @@ int main(void)
 	
 	//initializing lots of things to 0 (i think its unnecessary)
 	init();
-	train_network(0,"combined_images.txt", "combined_labels.txt", "Weights/weightsIH_combined.txt", "Weights/weightsHO_combined.txt");
+	// train_network(0,"combined_images.txt", "combined_labels.txt", "Weights/weightsIH_combined.txt", "Weights/weightsHO_combined.txt");
 	// train_network(0,"signs_images.txt", "signs_labels.txt", "Weights/weightsIH_signs.txt", "Weights/weightsHO_signs.txt");
 	// batch_identify(1, "mnisttest.txt", "mnisttestlabel.txt", "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	// batch_identify(1, "mnisttest.txt", "mnisttestlabel.txt", "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt", 10000);
 	double first[input_size][input_size], second[input_size][input_size], third[input_size][input_size];
-	// split_bmp("/Users/Daniel/Documents/Neural_Network/Numbers/zeroonefour.bmp",first,second,third);	
-	// print_image(first);
-	// load_weights("Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
 	
+	split_bmp("/Users/Daniel/Documents/Neural_Network/Numbers/oneplustwo.bmp",first,second,third);	
+	// print_image(first);
+	load_weights("Weights/weightsIH_combined.txt", "Weights/weightsHO_combined.txt");
+	// print_image(first);
+	// print_image(second);
+	// print_image(third);
 
-	// int c = identify_image(first,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	int a = identify_image(first,0, "Weights/weightsIH_.txt", "Weights/weightsHO_digits.txt");
 	// printf("image is a: %d\n",c);
-	// c = identify_image(second,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	int b = identify_image(second,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
 	// printf("image is a: %d\n",c);
-	// c = identify_image(third,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
-	// printf("image is a: %d\n",c);
+	int c = identify_image(third,0, "Weights/weightsIH_digits.txt", "Weights/weightsHO_digits.txt");
+	
+	char symbol[5];
+	switch (b) {
+		case 10:
+			strcpy(symbol, "+");
+			break;
+		case 11:
+			strcpy(symbol, "-");
+			break;
+		case 12:
+			strcpy(symbol, "/");
+			break;
+		case 13:
+			strcpy(symbol, "x");
+			break;
+		default:
+			strcpy(symbol, "?");
+			break;
+	}
+	printf("%d %s %d\n", a, symbol,c);
+
 	
  //    fprintf(stdout, "Goodbye!\n") ;
 	// // L138_initialise_intr(FS_8000_HZ,ADC_GAIN_0DB,DAC_ATTEN_0DB,LCDK_LINE_INPUT);
@@ -287,7 +311,7 @@ int identify_image(double image[input_size][input_size], int load_w, char * IH, 
 	return arg_max(img_output);
 }
 
-void batch_identify(int load_w, char * images, char * labels, char * IH, char * HO) {
+void batch_identify(int load_w, char * images, char * labels, char * IH, char * HO, int num_images) {
 	int correct = 0;
 	int i, j, k;
 	FILE * fp;
@@ -295,18 +319,18 @@ void batch_identify(int load_w, char * images, char * labels, char * IH, char * 
 		load_weights(IH, HO);
 	}
 	fp = fopen(images, "r");
-	for (i = 0; i < num_input; i++) 
+	for (i = 0; i < num_images; i++) 
 		for (j = 0; j < input_size; j++) 
 			for (k = 0; k < input_size; k++) 
 				fscanf(fp, "%lf", &Input[i][j][k]);/////switched and k and j
 	fclose(fp);
 
 	fp = fopen(labels, "r");
-	for (i = 0; i < num_input; i++) 
+	for (i = 0; i < num_images; i++) 
 		for (j = 0; j < num_output; j++) 
 			fscanf(fp, "%lf", &Target[i][j]);
 
-	for (i = 0; i < num_input;i++) {
+	for (i = 0; i < num_images;i++) {
 		if (arg_max(Target[i]) == identify_image(Input[i], 0, NULL, NULL))
 			correct++;
 	}
